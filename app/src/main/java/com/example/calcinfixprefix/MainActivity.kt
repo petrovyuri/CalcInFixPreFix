@@ -1,84 +1,157 @@
 package com.example.calcinfixprefix
 
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
 import kotlinx.android.synthetic.main.activity_main.*
 
 class MainActivity : AppCompatActivity() {
 
-    private var stack = mutableListOf<Char>()
-    private var equeu = mutableListOf<Char>()
-
+    private var mStack = mutableListOf<String>()
+    private var mQueue = mutableListOf<String>()
+    private var mExpressionList = mutableListOf<String>()
+    private lateinit var mTvAnswer:TextView
+    private lateinit var mTvPostfix:TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        mTvAnswer = tv_answer
+        mTvPostfix = tv_postfix
         btn_calc.setOnClickListener {
             val expression = et_expression.text.toString()
-            tw_answer.text = ""
-            stack.clear()
-            equeu.clear()
-            getPostFix(expression)
-            var postFixEx = buildString {
-                equeu.forEach {
-                    append(it.toString())
-                }
-            }
-            tw_answer.text = postFixEx
+            parseExpression(expression)
+            getPostFixEx()
+            calcPostFix()
         }
-
-
     }
 
-    private fun getPostFix(expression: String) {
+    private fun parseExpression(expression:String) {
         expression.forEach {
-            when {
-                it == '(' -> stack.add(it)
-                it == ')' -> {
-                    if (expression.contains('(')) {
-                        popStack()
-                    }
-                }
-                Regex("[\\d]").containsMatchIn(it.toString()) -> equeu.add(it)
-                Regex("[+-]").containsMatchIn(it.toString()) -> {
-                    if (stack.isEmpty() || stack.last() == '(') stack.add(it)
-                    else {
-                        if (Regex("[/*]").containsMatchIn(it.toString())) {
-                            popStack()
-                            stack.add(it)
-                        } else {
-                            equeu.add(stack.last())
-                            stack[stack.lastIndex] = it
-                        }
-                    }
-                }
-                Regex("[/*]").containsMatchIn(it.toString()) -> {
-                    if (stack.isNotEmpty() && (stack.last() == '*' || stack.last() == '/')) {
-                        popStack()
-                    }
-                    stack.add(it)
-                }
-
-            }
-        }
-        if (stack.isNotEmpty()) {
-            for (i in stack.lastIndex downTo 0) {
-                if (stack[i] != '(') {
-                    equeu.add(stack[i])
-                } else throw Exception("Error")
-            }
+           mExpressionList.add(it.toString())
         }
     }
 
-    private fun popStack() {
-        Loop@ for (i in stack.lastIndex downTo 0) {
-            if (stack[i] == '(') {
-                stack[i] = ' '
+    private fun getPostFixEx() {
+        // Перебираем expressionList
+        mExpressionList.forEach {
+            when {
+                //Если входящий элемент левая скобка делаем PUSH
+                it == "(" -> push(it)
+
+                //Если входящий элемент правая скобка делаем POP
+                it == ")" -> {
+                    if (mExpressionList.contains("(")) {
+                        pop()
+                    }
+                }
+
+                //Если входящий элемент число, то добавляем в очередь
+                Regex("[\\d]").containsMatchIn(it) -> addQueue(it)
+
+                //Если входящий элемент + или -
+                Regex("[+-]").containsMatchIn(it) ->
+                    /* Проверяем, если стек пустой или на вершине стека левая скобка,
+                    * то делаем PUSH */
+                    if (mStack.isEmpty() || mStack.last() == "(") push(it)
+                    /* Иначе, если на вершине стека оператор имеющий больший
+                    * приоритет, то делаем POP, потом PUSH */
+                    else if (mStack.last().contains(Regex("[/*]"))) {
+                        pop()
+                        push(it)
+                    }
+                    // Иначе просто делаем PUSH
+                    else {
+                        addQueue(mStack.last())
+                        mStack[mStack.lastIndex] = it
+                    }
+
+                //Если входящий элемент * или /
+                Regex("[*/]").containsMatchIn(it) -> {
+                    /* Проверяем, если на вершине стека элемент с таким же приоритетом,
+                    * то делаем POP */
+                    if (mStack.isNotEmpty() && (mStack.last() == "*" || mStack.last() == "/")) {
+                        pop()
+                    }
+                    // Потом делаем PUSH
+                    push(it)
+                }
+            }
+        }
+        // Когда перебрали все элементы выражения, то добавляем из стека элементы в очередь
+        if (mStack.isNotEmpty()) {
+            for (i in mStack.lastIndex downTo 0) {
+                if (mStack[i] != "(") {
+                    addQueue(mStack[i])
+                }
+            }
+        }
+        var postfix = buildString {
+            mQueue.forEach {
+                append(it)
+            }
+        }
+        mTvPostfix.text = postfix
+    }
+
+    private fun pop() {
+        // Выгружаем стек в очередь пока не найдем левую скобку, потом удаляем скобку из стека
+        Loop@ for (i in mStack.lastIndex downTo 0) {
+            if (mStack[i] == "(") {
+                mStack[i] = " "
                 break@Loop
             }
-            equeu.add(stack[i])
+            addQueue(mStack[i])
+            mStack[i] = " "
         }
-        stack.removeIf { it == ' ' }
+        mStack.removeIf { it == " " }
+    }
+
+    private fun addQueue(item: String) {
+        mQueue.add(item)
+    }
+
+    private fun push(item: String) {
+        mStack.add(item)
+    }
+
+    private fun calcPostFix() {
+        //Создаем стек для работы
+        val stack = mutableListOf<Int>()
+        // Перебераем все эелементы очереди
+        for (item in mQueue) {
+            when {
+                // Если входящий элемент - число, то добавляем в стек
+                Regex("[\\d]").containsMatchIn(item) -> {
+                    stack.add(item.toInt())
+                }
+                /* Если входящий элемент + , берем два последних элемента
+                и производим советующую операцию */
+                item == "+" -> {
+                    stack[stack.lastIndex - 1] = stack[stack.lastIndex - 1] + stack.last()
+                    stack.removeAt(stack.lastIndex)
+                }
+                /* Если входящий элемент * , берем два последних элемента
+                и производим советующую операцию */
+                item == "*" -> {
+                    stack[stack.lastIndex - 1] = stack[stack.lastIndex - 1] * stack.last()
+                    stack.removeAt(stack.lastIndex)
+                }
+                /* Если входящий элемент / , берем два последних элемента
+                и производим советующую операцию */
+                item == "/" -> {
+                    stack[stack.lastIndex - 1] = stack[stack.lastIndex - 1] / stack.last()
+                    stack.removeAt(stack.lastIndex)
+                }
+                /* Если входящий элемент -, берем два последних элемента
+                 и производим советующую операцию */
+                item == "-" -> {
+                    stack[stack.lastIndex - 1] = stack[stack.lastIndex - 1] - stack.last()
+                    stack.removeAt(stack.lastIndex)
+                }
+            }
+        }
+        mTvAnswer.text = stack.first().toString()
     }
 
 }
