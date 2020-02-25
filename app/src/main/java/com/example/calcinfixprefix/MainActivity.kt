@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlin.math.pow
 
 class MainActivity : AppCompatActivity() {
 
@@ -44,6 +45,9 @@ class MainActivity : AppCompatActivity() {
                     if (mExpressionList.contains("(")) {
                         pop()
                     }
+                }
+                it == "^" -> {
+                    push(it)
                 }
 
                 //Если входящий элемент число, то добавляем в очередь
@@ -149,6 +153,10 @@ class MainActivity : AppCompatActivity() {
                     stack[stack.lastIndex - 1] = stack[stack.lastIndex - 1] - stack.last()
                     stack.removeAt(stack.lastIndex)
                 }
+                item == "^" -> {
+                    stack[stack.lastIndex - 1] =  (stack[stack.lastIndex - 1].toDouble().pow(stack.last())).toInt()
+                    stack.removeAt(stack.lastIndex)
+            }
             }
         }
         mTvAnswer.text = stack.first().toString()
